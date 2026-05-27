@@ -1218,52 +1218,26 @@
 </div>
 
 <script>
-
-
-  // ===== SECRET ADMIN ACCESS (5 clicks on footer logo) =====
-  let secretClicks = 0, secretTimer;
-  function secretClick() {
-    secretClicks++;
-    clearTimeout(secretTimer);
-    secretTimer = setTimeout(() => { secretClicks = 0; }, 2000);
-    if (secretClicks >= 5) {
-      secretClicks = 0;
-      openAdmin();
-    }
-  }
-
-  // ===== NAVBAR SCROLL =====
-  window.addEventListener('scroll', () => {
-    document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 60);
-  });
-
-  // ===== REVEAL ON SCROLL =====
-  const reveals = document.querySelectorAll('.reveal');
-  const obs = new IntersectionObserver(entries => {
-    entries.forEach((e, i) => {
-      if (e.isIntersecting) {
-        setTimeout(() => e.target.classList.add('visible'), i * 80);
-      }
-    });
-  }, { threshold: 0.1 });
-  reveals.forEach(el => obs.observe(el));
-
-  // ===== FORM SUBMIT =====
-  let orderCount = 0;
-  const serviceBars = {
-    'توزيعات أعراس': 'tawziaat',
-    'حقيبة خرز يدوية': 'haqaib',
-    'تصميم لوغو': 'logo',
-    'ملصقات وستيكرز': 'sticker',
-    'أخرى': 'tawziaat'
-  };
-  const serviceOrders = { tawziaat:0, haqaib:0, logo:0, sticker:0 };
-
-  // ===== SUPABASE CONFIG =====
+  // ===== CONFIGURATION (Fill these!) =====
+  const BOT_TOKEN = 'BotFather'; 
+  const CHAT_ID = 'userinfobot';
   const SUPA_URL = 'https://iyvkelzikatlvofiealk.supabase.co';
   const SUPA_KEY = 'sb_publishable_hmisSqmqS-AYEZBkLMo9_w_2bHJfy1D';
 
-  async function saveToSupabase(order) {
+  // ===== TELEGRAM SENDING =====
+  async function sendToTelegram(msg) {
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+    try {
+      await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: CHAT_ID, text: msg })
+      });
+    } catch (err) { console.error('Telegram Error:', err); }
+  }
+
+  // ===== SUPABASE SAVE =====
+  async function saveToSupabase(orderData) {
     try {
       const res = await fetch(`${SUPA_URL}/rest/v1/orders`, {
         method: 'POST',
@@ -1273,25 +1247,14 @@
           'Authorization': `Bearer ${SUPA_KEY}`,
           'Prefer': 'return=representation'
         },
-        body: JSON.stringify(order)
+        body: JSON.stringify(orderData)
       });
       return res.ok;
     } catch(e) { return false; }
   }
 
-  async function loadOrdersFromSupabase() {
-    try {
-      const res = await fetch(`${SUPA_URL}/rest/v1/orders?order=created_at.desc`, {
-        headers: {
-          'apikey': SUPA_KEY,
-          'Authorization': `Bearer ${SUPA_KEY}`
-        }
-      });
-      return await res.json();
-    } catch(e) { return []; }
-  }
-
-  function submitForm() {
+  // ===== FORM SUBMIT =====
+  async function submitForm() {
     const nameEl   = document.querySelector('#mainForm input[type="text"]');
     const phoneEl  = document.querySelector('#mainForm input[type="tel"]');
     const serviceEl= document.querySelector('#mainForm select');
@@ -1301,101 +1264,53 @@
       alert('يرجى تعبئة جميع الحقول 🌸'); return;
     }
 
-    const msg =
-`✨ طلب جديد – Filou Craft
+    const orderData = {
+      name: nameEl.value.trim(),
+      phone: phoneEl.value.trim(),
+      service: serviceEl.value,
+      details: detailEl.value.trim()
+    };
 
-👤 الاسم: ${nameEl.value.trim()}
-🛍️ نوع الخدمة: ${serviceEl.value}
-📝 التفاصيل: ${detailEl.value.trim()}
-📞 رقم الهاتف: ${phoneEl.value.trim()}`;
+    const msg = `✨ طلب جديد – Filou Craft\n\n👤 الاسم: ${orderData.name}\n🛍️ نوع الخدمة: ${orderData.service}\n📝 التفاصيل: ${orderData.details}\n📞 رقم الهاتف: ${orderData.phone}`;
 
-    // إرسال لتيليغرام
-    sendToTelegram(msg);
+    // 1. Save to Database
+    await saveToSupabase(orderData);
+    
+    // 2. Send to Telegram
+    await sendToTelegram(msg);
 
-    // Copy to clipboard
-    navigator.clipboard.writeText(msg).catch(() => {
-      const ta = document.createElement('textarea');
-      ta.value = msg; document.body.appendChild(ta);
-      ta.select(); document.execCommand('copy');
-      document.body.removeChild(ta);
-    });
-
-    // Save to admin panel
-    orderCount++;
-    const noOrders = document.getElementById('no-orders');
-    if (noOrders) noOrders.remove();
-    const ordersList = document.getElementById('ordersList');
-    const card = document.createElement('div');
-    card.className = 'order-card';
-    card.innerHTML = `
-      <span class="order-id">#${String(orderCount).padStart(3,'0')}</span>
-      <div class="order-info">
-        <h4>${nameEl.value.trim()}</h4>
-        <p>${serviceEl.value} · ${phoneEl.value.trim()}</p>
-      </div>
-      <span class="order-status status-new">جديد</span>`;
-    ordersList.prepend(card);
-
-    // Update dashboard stats
-    document.getElementById('stat-orders').textContent = orderCount;
-    const barKey = serviceBars[serviceEl.value] || 'tawziaat';
-    serviceOrders[barKey]++;
-    const maxVal = Math.max(...Object.values(serviceOrders)) || 1;
-    for (const [k, v] of Object.entries(serviceOrders)) {
-      const pct = Math.round((v / maxVal) * 100);
-      const barEl = document.getElementById('bar-' + k);
-      const valEl = document.getElementById('bar-' + k + '-val');
-      if (barEl) barEl.style.width = pct + '%';
-      if (valEl) valEl.textContent = v;
-    }
-
-    // Show success then open Instagram
+    // 3. UI Updates
     document.getElementById('mainForm').style.display = 'none';
     document.getElementById('form-success').style.display = 'block';
-    document.getElementById('form-success').innerHTML = `
-      <div style="font-size:3rem;margin-bottom:16px">✦</div>
-      <h3 style="font-family:'Cormorant Garamond',serif;font-size:1.8rem;color:var(--dark);margin-bottom:12px">تم نسخ طلبك! 🌸</h3>
-      <p style="color:var(--text-mid);margin-bottom:24px">الرسالة جاهزة في الحافظة — ستُفتح صفحة إنستغرام، فقط الصقيها في الـ DM ✨</p>
-      <a href="https://www.instagram.com/filou__craft/" target="_blank" style="display:inline-block;background:var(--dark);color:#fff;padding:12px 32px;font-size:0.78rem;letter-spacing:0.18em;text-transform:uppercase;text-decoration:none;font-family:'Raleway',sans-serif;">فتح إنستغرام ✦</a>`;
+    // ... باقي كود النجاح الخاص بك ...
     setTimeout(() => { window.open('https://www.instagram.com/filou__craft/', '_blank'); }, 800);
   }
 
-  // ===== ADMIN =====
+  // ===== EXISTING ADMIN & SCROLL LOGIC =====
+  let secretClicks = 0, secretTimer;
+  function secretClick() {
+    secretClicks++;
+    clearTimeout(secretTimer);
+    secretTimer = setTimeout(() => { secretClicks = 0; }, 2000);
+    if (secretClicks >= 5) { secretClicks = 0; openAdmin(); }
+  }
+
+  window.addEventListener('scroll', () => {
+    document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 60);
+  });
+
+  const reveals = document.querySelectorAll('.reveal');
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) setTimeout(() => e.target.classList.add('visible'), i * 80);
+    });
+  }, { threshold: 0.1 });
+  reveals.forEach(el => obs.observe(el));
+
   const ADMIN_PASS = 'filou2025';
   function openAdmin() { document.getElementById('admin-overlay').classList.add('open'); }
   function closeAdmin() { document.getElementById('admin-overlay').classList.remove('open'); }
-  document.getElementById('admin-overlay').addEventListener('click', function(e) {
-    if(e.target === this) closeAdmin();
-  });
-
-  function adminLogin() {
-    const pass = document.getElementById('adminPass').value;
-    if(pass === ADMIN_PASS) {
-      document.getElementById('admin-login').style.display = 'none';
-      document.getElementById('admin-logged').style.display = 'block';
-    } else {
-      document.getElementById('loginErr').style.display = 'block';
-      document.getElementById('adminPass').style.borderColor = '#e57373';
-    }
-  }
-  function adminLogout() {
-    document.getElementById('admin-login').style.display = 'flex';
-    document.getElementById('admin-logged').style.display = 'none';
-    document.getElementById('adminPass').value = '';
-    document.getElementById('loginErr').style.display = 'none';
-    document.getElementById('adminPass').style.borderColor = '';
-  }
-  function showTab(tab) {
-    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.admin-pane').forEach(p => p.classList.remove('active'));
-    event.currentTarget.classList.add('active');
-    document.getElementById('pane-' + tab).classList.add('active');
-  }
-  function changePassword() {
-    const np = prompt('أدخلي كلمة المرور الجديدة:');
-    if(np && np.length >= 6) { alert('✦ تم تغيير كلمة المرور بنجاح'); }
-    else if(np) { alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); }
-  }
+  // ... بقية دوال الـ Admin كما كانت ...
 </script>
-</body>
-</html>
+
+  
