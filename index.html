@@ -1218,13 +1218,11 @@
 </div>
 
 <script>
-  // ===== CONFIGURATION (Fill these!) =====
   const BOT_TOKEN = 'BotFather'; 
   const CHAT_ID = 'userinfobot';
   const SUPA_URL = 'https://iyvkelzikatlvofiealk.supabase.co';
   const SUPA_KEY = 'sb_publishable_hmisSqmqS-AYEZBkLMo9_w_2bHJfy1D';
 
-  // ===== TELEGRAM SENDING =====
   async function sendToTelegram(msg) {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
     try {
@@ -1236,7 +1234,6 @@
     } catch (err) { console.error('Telegram Error:', err); }
   }
 
-  // ===== SUPABASE SAVE =====
   async function saveToSupabase(orderData) {
     try {
       const res = await fetch(`${SUPA_URL}/rest/v1/orders`, {
@@ -1253,7 +1250,6 @@
     } catch(e) { return false; }
   }
 
-  // ===== FORM SUBMIT =====
   async function submitForm() {
     const nameEl   = document.querySelector('#mainForm input[type="text"]');
     const phoneEl  = document.querySelector('#mainForm input[type="tel"]');
@@ -1273,20 +1269,14 @@
 
     const msg = `✨ طلب جديد – Filou Craft\n\n👤 الاسم: ${orderData.name}\n🛍️ نوع الخدمة: ${orderData.service}\n📝 التفاصيل: ${orderData.details}\n📞 رقم الهاتف: ${orderData.phone}`;
 
-    // 1. Save to Database
     await saveToSupabase(orderData);
-    
-    // 2. Send to Telegram
     await sendToTelegram(msg);
 
-    // 3. UI Updates
     document.getElementById('mainForm').style.display = 'none';
     document.getElementById('form-success').style.display = 'block';
-    // ... باقي كود النجاح الخاص بك ...
     setTimeout(() => { window.open('https://www.instagram.com/filou__craft/', '_blank'); }, 800);
   }
 
-  // ===== EXISTING ADMIN & SCROLL LOGIC =====
   let secretClicks = 0, secretTimer;
   function secretClick() {
     secretClicks++;
@@ -1311,4 +1301,23 @@
   function openAdmin() { document.getElementById('admin-overlay').classList.add('open'); }
   function closeAdmin() { document.getElementById('admin-overlay').classList.remove('open'); }
   
+  function adminLogin() {
+    const pass = document.getElementById('adminPass').value;
+    if(pass === ADMIN_PASS) {
+      document.getElementById('admin-login').style.display = 'none';
+      document.getElementById('admin-logged').style.display = 'block';
+      document.getElementById('loginErr').style.display = 'none';
+    } else {
+      document.getElementById('loginErr').style.display = 'block';
+      document.getElementById('adminPass').style.borderColor = '#e57373';
+    }
+  }
+
+  function adminLogout() {
+    document.getElementById('admin-login').style.display = 'flex';
+    document.getElementById('admin-logged').style.display = 'none';
+    document.getElementById('adminPass').value = '';
+    document.getElementById('loginErr').style.display = 'none';
+    document.getElementById('adminPass').style.borderColor = '';
+  }
 </script>
