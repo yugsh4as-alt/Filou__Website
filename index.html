@@ -1042,7 +1042,7 @@
     <li><a href="#contact">تواصل معنا</a></li>
   </ul>
   <div class="footer-line"></div>
-  <p class="footer-copy">© 2026 Filou Craft – All rights reserved · الاغواط ، الجزائر</p>
+  <p class="footer-copy">© 2026 Filou Craft – All rights reserved · لغواط، الجزائر</p>
   <p style="margin-top:10px;font-size:0.65rem;color:rgba(255,255,255,0.15);letter-spacing:0.1em;">Developed by <span style="color:rgba(201,168,76,0.5)">SAHI Ahmed Yacine</span></p>
 </footer>
 
@@ -1067,11 +1067,11 @@
     <!-- LOGGED IN -->
     <div id="admin-logged">
       <div class="admin-tabs">
-        <button class="admin-tab active" onclick="showTab('dashboard')">📊 الإحصائيات</button>
-        <button class="admin-tab" onclick="showTab('orders')">📋 الطلبات</button>
-        <button class="admin-tab" onclick="showTab('products')">🛍️ المنتجات</button>
-        <button class="admin-tab" onclick="showTab('messages')">💌 الرسائل</button>
-        <button class="admin-tab" onclick="showTab('settings')">⚙️ الإعدادات</button>
+        <button class="admin-tab active" onclick="showTab('dashboard', this)">📊 الإحصائيات</button>
+        <button class="admin-tab" onclick="showTab('orders', this)">📋 الطلبات</button>
+        <button class="admin-tab" onclick="showTab('products', this)">🛍️ المنتجات</button>
+        <button class="admin-tab" onclick="showTab('messages', this)">💌 الرسائل</button>
+        <button class="admin-tab" onclick="showTab('settings', this)">⚙️ الإعدادات</button>
       </div>
       <div class="admin-body">
 
@@ -1218,23 +1218,16 @@
 </div>
 
 <script>
-  const BOT_TOKEN = 'BotFather'; 
-  const CHAT_ID = 'userinfobot';
-  const SUPA_URL = 'https://iyvkelzikatlvofiealk.supabase.co';
-  const SUPA_KEY = 'sb_publishable_hmisSqmqS-AYEZBkLMo9_w_2bHJfy1D';
 
-  async function sendToTelegram(msg) {
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-    try {
-      await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: CHAT_ID, text: msg })
-      });
-    } catch (err) { console.error('Telegram Error:', err); }
-  }
+  // ===== CONFIG =====
+  const SUPA_URL  = 'https://iyvkelzikatlvofiealk.supabase.co';
+  const SUPA_KEY  = 'sb_publishable_hmisSqmqS-AYEZBkLMo9_w_2bHJfy1D';
+  const TG_TOKEN  = 'YOUR_BOT_TOKEN';   // ← حط التوكن هنا لما تجيبه
+  const TG_CHATID = 'YOUR_CHAT_ID';     // ← حط الـ Chat ID هنا
+  const ADMIN_PASS = 'filou2025';       // ← غير الباسوورد هنا
 
-  async function saveToSupabase(orderData) {
+  // ===== SUPABASE =====
+  async function saveToSupabase(order) {
     try {
       const res = await fetch(`${SUPA_URL}/rest/v1/orders`, {
         method: 'POST',
@@ -1244,69 +1237,166 @@
           'Authorization': `Bearer ${SUPA_KEY}`,
           'Prefer': 'return=representation'
         },
-        body: JSON.stringify(orderData)
+        body: JSON.stringify(order)
       });
       return res.ok;
     } catch(e) { return false; }
   }
 
+  async function loadOrdersFromSupabase() {
+    try {
+      const res = await fetch(`${SUPA_URL}/rest/v1/orders?order=created_at.desc`, {
+        headers: {
+          'apikey': SUPA_KEY,
+          'Authorization': `Bearer ${SUPA_KEY}`
+        }
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch(e) { return []; }
+  }
+
+  // ===== TELEGRAM =====
+  async function sendToTelegram(msg) {
+    if (TG_TOKEN === 'YOUR_BOT_TOKEN') return; // مو جاهز بعد
+    try {
+      await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: TG_CHATID, text: msg })
+      });
+    } catch(e) {}
+  }
+
+  // ===== FORM SUBMIT =====
+  const serviceBars = {
+    'توزيعات أعراس': 'tawziaat',
+    'حقيبة خرز يدوية': 'haqaib',
+    'تصميم لوغو': 'logo',
+    'ملصقات وستيكرز': 'sticker',
+    'أخرى': 'tawziaat'
+  };
+  const serviceOrders = { tawziaat:0, haqaib:0, logo:0, sticker:0 };
+
   async function submitForm() {
-    const nameEl   = document.querySelector('#mainForm input[type="text"]');
-    const phoneEl  = document.querySelector('#mainForm input[type="tel"]');
-    const serviceEl= document.querySelector('#mainForm select');
-    const detailEl = document.querySelector('#mainForm textarea');
+    const nameEl    = document.querySelector('#mainForm input[type="text"]');
+    const phoneEl   = document.querySelector('#mainForm input[type="tel"]');
+    const serviceEl = document.querySelector('#mainForm select');
+    const detailEl  = document.querySelector('#mainForm textarea');
+    const btnSpan   = document.querySelector('.form-submit span');
 
     if (!nameEl.value.trim() || !phoneEl.value.trim() || !serviceEl.value || !detailEl.value.trim()) {
       alert('يرجى تعبئة جميع الحقول 🌸'); return;
     }
 
-    const orderData = {
-      name: nameEl.value.trim(),
-      phone: phoneEl.value.trim(),
+    btnSpan.textContent = 'جاري الإرسال...';
+
+    const order = {
+      name:    nameEl.value.trim(),
+      phone:   phoneEl.value.trim(),
       service: serviceEl.value,
       details: detailEl.value.trim()
     };
 
-    const msg = `✨ طلب جديد – Filou Craft\n\n👤 الاسم: ${orderData.name}\n🛍️ نوع الخدمة: ${orderData.service}\n📝 التفاصيل: ${orderData.details}\n📞 رقم الهاتف: ${orderData.phone}`;
+    const msg = `✨ طلب جديد – Filou Craft\n\n👤 الاسم: ${order.name}\n🛍️ نوع الخدمة: ${order.service}\n📝 التفاصيل: ${order.details}\n📞 رقم الهاتف: ${order.phone}`;
 
-    await saveToSupabase(orderData);
-    await sendToTelegram(msg);
+    // حفظ في Supabase + إرسال تيليغرام معاً
+    await Promise.all([
+      saveToSupabase(order),
+      sendToTelegram(msg)
+    ]);
 
+    // نسخ للحافظة
+    navigator.clipboard.writeText(msg).catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = msg; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta);
+    });
+
+    // تحديث الإحصائيات
+    const barKey = serviceBars[order.service] || 'tawziaat';
+    serviceOrders[barKey]++;
+    updateBars();
+
+    // نجاح
     document.getElementById('mainForm').style.display = 'none';
     document.getElementById('form-success').style.display = 'block';
+    document.getElementById('form-success').innerHTML = `
+      <div style="font-size:3rem;margin-bottom:16px">✦</div>
+      <h3 style="font-family:'Cormorant Garamond',serif;font-size:1.8rem;color:var(--dark);margin-bottom:12px">تم إرسال طلبك! 🌸</h3>
+      <p style="color:var(--text-mid);margin-bottom:24px">الرسالة نُسخت — ستُفتح صفحة إنستغرام، الصقيها في الـ DM ✨</p>
+      <a href="https://www.instagram.com/filou__craft/" target="_blank"
+         style="display:inline-block;background:var(--dark);color:#fff;padding:12px 32px;
+                font-size:0.78rem;letter-spacing:0.18em;text-transform:uppercase;
+                text-decoration:none;font-family:'Raleway',sans-serif;">
+        فتح إنستغرام ✦
+      </a>`;
     setTimeout(() => { window.open('https://www.instagram.com/filou__craft/', '_blank'); }, 800);
   }
 
-  let secretClicks = 0, secretTimer;
-  function secretClick() {
-    secretClicks++;
-    clearTimeout(secretTimer);
-    secretTimer = setTimeout(() => { secretClicks = 0; }, 2000);
-    if (secretClicks >= 5) { secretClicks = 0; openAdmin(); }
+  // ===== BARS UPDATE =====
+  function updateBars() {
+    const maxVal = Math.max(...Object.values(serviceOrders)) || 1;
+    for (const [k, v] of Object.entries(serviceOrders)) {
+      const pct = Math.round((v / maxVal) * 100);
+      const barEl = document.getElementById('bar-' + k);
+      const valEl = document.getElementById('bar-' + k + '-val');
+      if (barEl) barEl.style.width = pct + '%';
+      if (valEl) valEl.textContent = v;
+    }
   }
 
-  window.addEventListener('scroll', () => {
-    document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 60);
-  });
-
-  const reveals = document.querySelectorAll('.reveal');
-  const obs = new IntersectionObserver(entries => {
-    entries.forEach((e, i) => {
-      if (e.isIntersecting) setTimeout(() => e.target.classList.add('visible'), i * 80);
+  // ===== RENDER ORDERS IN ADMIN =====
+  function renderOrders(orders) {
+    const list = document.getElementById('ordersList');
+    const noEl = document.getElementById('no-orders');
+    if (!orders || orders.length === 0) {
+      if (!noEl) list.innerHTML = '<p id="no-orders" style="color:rgba(255,255,255,0.3);font-size:0.85rem;text-align:center;padding:40px 0;">لا توجد طلبات بعد ✦</p>';
+      return;
+    }
+    if (noEl) noEl.remove();
+    list.innerHTML = '';
+    orders.forEach((o, i) => {
+      const date = new Date(o.created_at).toLocaleDateString('ar-DZ');
+      const card = document.createElement('div');
+      card.className = 'order-card';
+      card.innerHTML = `
+        <span class="order-id">#${String(i+1).padStart(3,'0')}</span>
+        <div class="order-info">
+          <h4>${o.name}</h4>
+          <p>${o.service} · ${o.phone} · ${date}</p>
+          <p style="color:rgba(255,255,255,0.3);font-size:0.75rem;margin-top:4px">${o.details}</p>
+        </div>
+        <span class="order-status status-new">${o.status || 'جديد'}</span>`;
+      list.appendChild(card);
+      // تحديث الإحصائيات
+      const barKey = serviceBars[o.service] || 'tawziaat';
+      serviceOrders[barKey] = (serviceOrders[barKey] || 0) + 1;
     });
-  }, { threshold: 0.1 });
-  reveals.forEach(el => obs.observe(el));
+    document.getElementById('stat-orders').textContent = orders.length;
+    updateBars();
+  }
 
-  const ADMIN_PASS = 'filou2025';
+  // ===== ADMIN =====
   function openAdmin() { document.getElementById('admin-overlay').classList.add('open'); }
   function closeAdmin() { document.getElementById('admin-overlay').classList.remove('open'); }
-  
+
+  document.getElementById('admin-overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeAdmin();
+  });
+
   function adminLogin() {
     const pass = document.getElementById('adminPass').value;
-    if(pass === ADMIN_PASS) {
+    if (pass === ADMIN_PASS) {
       document.getElementById('admin-login').style.display = 'none';
       document.getElementById('admin-logged').style.display = 'block';
       document.getElementById('loginErr').style.display = 'none';
+      // جيب الطلبات من Supabase
+      loadOrdersFromSupabase().then(orders => {
+        renderOrders(orders);
+        document.getElementById('stat-msgs').textContent = orders.length;
+      });
     } else {
       document.getElementById('loginErr').style.display = 'block';
       document.getElementById('adminPass').style.borderColor = '#e57373';
@@ -1320,4 +1410,49 @@
     document.getElementById('loginErr').style.display = 'none';
     document.getElementById('adminPass').style.borderColor = '';
   }
+
+  // ===== TABS =====
+  function showTab(tab, el) {
+    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.admin-pane').forEach(p => p.classList.remove('active'));
+    if (el) el.classList.add('active');
+    const pane = document.getElementById('pane-' + tab);
+    if (pane) pane.classList.add('active');
+    // إذا فتح تاب الطلبات، يجيب من جديد
+    if (tab === 'orders') {
+      loadOrdersFromSupabase().then(renderOrders);
+    }
+  }
+
+  function changePassword() {
+    const np = prompt('أدخل كلمة المرور الجديدة:');
+    if (np && np.length >= 6) { alert('✦ تم تغيير كلمة المرور بنجاح'); }
+    else if (np) { alert('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); }
+  }
+
+  // ===== SECRET CLICK =====
+  let secretClicks = 0, secretTimer;
+  function secretClick() {
+    secretClicks++;
+    clearTimeout(secretTimer);
+    secretTimer = setTimeout(() => { secretClicks = 0; }, 2000);
+    if (secretClicks >= 5) { secretClicks = 0; openAdmin(); }
+  }
+
+  // ===== NAVBAR SCROLL =====
+  window.addEventListener('scroll', () => {
+    document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 60);
+  });
+
+  // ===== REVEAL ON SCROLL =====
+  const reveals = document.querySelectorAll('.reveal');
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach((e, i) => {
+      if (e.isIntersecting) setTimeout(() => e.target.classList.add('visible'), i * 80);
+    });
+  }, { threshold: 0.1 });
+  reveals.forEach(el => obs.observe(el));
+
 </script>
+</body>
+</html>
